@@ -11,23 +11,45 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
         
-    - name: Compile App Bundle Binary
+    - name: Compile App Binary with Frameworks
       run: |
-        mkdir -p build/Payload
+        mkdir -p build/Payload/CardTracker.app
         xcrun --sdk iphoneos swiftc App.swift \
           -target arm64-apple-ios15.0 \
-          -o build/Payload/CardTracker \
+          -o build/Payload/CardTracker.app/CardTracker \
           -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
           -emit-executable \
           -parse-as-library
 
-    - name: Package App Bundle Structure
+    - name: Generate High Resolution App Icons
       run: |
-        cd build
-        mkdir -p Payload/CardTracker.app
-        mv Payload/CardTracker Payload/CardTracker.app/CardTracker
+        # Generate generic stylized minimalist icon matrix via CoreImage engine directly 
+        mkdir -p build/Payload/CardTracker.app/Assets
+        /usr/bin/swift -e '
+        import Foundation
+        import CoreImage
+        import AppKit
         
-        # Create minimal required Info.plist
+        let ctx = CIContext()
+        if let filter = CIFilter(name: "CILinearGradient") {
+            filter.setValue(CIVector(x: 0, y: 0), forKey: "inputPoint0")
+            filter.setValue(CIVector(x: 1024, y: 1024), forKey: "inputPoint1")
+            filter.setValue(CIColor(red: 0.1, green: 0.1, blue: 0.3), forKey: "inputColor0")
+            filter.setValue(CIColor(red: 0.3, green: 0.0, blue: 0.5), forKey: "inputColor1")
+            if let output = filter.outputImage?.cropped(to: CGRect(x: 0, y: 0, width: 1024, height: 1024)) {
+                if let cgImage = ctx.createCGImage(output, from: output.extent) {
+                    let rep = NSBitmapImageRep(cgImage: cgImage)
+                    if let data = rep.representation(using: .png, properties: [:]) {
+                        try? data.write(to: URL(fileURLWithPath: "build/Payload/CardTracker.app/AppIcon60x60@2x.png"))
+                        try? data.write(to: URL(fileURLWithPath: "build/Payload/CardTracker.app/AppIcon60x60@3x.png"))
+                    }
+                }
+            }
+        }'
+
+    - name: Package App Bundle Metadata and Core Entitlements
+      run: |
+        # Generate complete configuration Plist manifest file
         echo '<?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
@@ -39,22 +61,45 @@ jobs:
             <key>CFBundleName</key>
             <string>CardTracker</string>
             <key>CFBundleShortVersionString</key>
-            <string>1.0</string>
+            <string>2.0</string>
             <key>CFBundleVersion</key>
-            <string>1</string>
+            <string>2</string>
             <key>MinimumOSVersion</key>
             <string>15.0</string>
+            <key>UIRequiredDeviceCapabilities</key>
+            <array><string>arm64</string></array>
             <key>UILaunchScreen</key>
             <dict/>
-            <key>WKApplication</key>
-            <false/>
+            <key>CFBundleIconFiles</key>
+            <array>
+                <string>AppIcon60x60</string>
+            </array>
         </dict>
-        </plist>' > Payload/CardTracker.app/Info.plist
-        
-        zip -r ../CardTracker.ipa Payload
+        </plist>' > build/Payload/CardTracker.app/Info.plist
+
+        # Generate custom embedded system configuration entitlement rule definitions for iCloud capability support mapping 
+        echo '<?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>com.apple.developer.icloud-container-identifiers</key>
+            <array>
+                <string>iCloud.com.yourname.cardtracker</string>
+            </array>
+            <key>com.apple.developer.icloud-services</key>
+            <array>
+                <string>CloudKit</string>
+            </array>
+            <key>com.apple.developer.ubiquity-kvstore-identifier</key>
+            <string>com.yourname.cardtracker</string>
+        </dict>
+        </plist>' > build/entitlements.plist
+
+        cd build
+        zip -r ../CardTracker.ipa Payload entitlements.plist
 
     - name: Upload Finished IPA Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: CardTracker-Unsigned-IPA
+        name: CardTracker-Premium-Unsigned-IPA
         path: CardTracker.ipa
