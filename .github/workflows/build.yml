@@ -1,4 +1,4 @@
-name: Build Unsigned iOS App
+name: Build Unsigned iOS App & Widget
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
         
-    - name: Compile App Binary with Modern Frameworks
+    - name: Compile Main App Binary
       run: |
         mkdir -p build/Payload/CardTracker.app
         xcrun --sdk iphoneos swiftc App.swift \
@@ -21,34 +21,19 @@ jobs:
           -emit-executable \
           -parse-as-library
 
-    - name: Generate Premium Custom Metallic App Icon
+    - name: Compile Widget Extension PlugIn
       run: |
-        # Injects a sleek deep slate blue layered application icon bundle
-        mkdir -p build/Payload/CardTracker.app
-        /usr/bin/swift -e '
-        import Foundation
-        import CoreImage
-        import AppKit
-        
-        let ctx = CIContext()
-        if let filter = CIFilter(name: "CILinearGradient") {
-            filter.setValue(CIVector(x: 0, y: 0), forKey: "inputPoint0")
-            filter.setValue(CIVector(x: 1024, y: 1024), forKey: "inputPoint1")
-            filter.setValue(CIColor(red: 0.08, green: 0.08, blue: 0.18), forKey: "inputColor0")
-            filter.setValue(CIColor(red: 0.15, green: 0.35, blue: 0.60), forKey: "inputColor1")
-            if let output = filter.outputImage?.cropped(to: CGRect(x: 0, y: 0, width: 1024, height: 1024)) {
-                if let cgImage = ctx.createCGImage(output, from: output.extent) {
-                    let rep = NSBitmapImageRep(cgImage: cgImage)
-                    if let data = rep.representation(using: .png, properties: [:]) {
-                        try? data.write(to: URL(fileURLWithPath: "build/Payload/CardTracker.app/AppIcon60x60@2x.png"))
-                        try? data.write(to: URL(fileURLWithPath: "build/Payload/CardTracker.app/AppIcon60x60@3x.png"))
-                    }
-                }
-            }
-        }'
+        mkdir -p build/Payload/CardTracker.app/PlugIns/CardTrackerWidget.appex
+        xcrun --sdk iphoneos swiftc Widget.swift App.swift \
+          -target arm64-apple-ios17.0 \
+          -o build/Payload/CardTracker.app/PlugIns/CardTrackerWidget.appex/CardTrackerWidget \
+          -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
+          -emit-executable \
+          -parse-as-library
 
-    - name: Inject Metadata Configuration Packages
+    - name: Package Metadata Profiles
       run: |
+        # Main App Manifest
         echo '<?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
@@ -60,27 +45,48 @@ jobs:
             <key>CFBundleName</key>
             <string>CardTracker</string>
             <key>CFBundleShortVersionString</key>
-            <string>3.0</string>
+            <string>4.0</string>
             <key>CFBundleVersion</key>
-            <string>3</string>
+            <string>4</string>
             <key>MinimumOSVersion</key>
             <string>17.0</string>
             <key>UIRequiredDeviceCapabilities</key>
             <array><string>arm64</string></array>
             <key>UILaunchScreen</key>
             <dict/>
-            <key>CFBundleIconFiles</key>
-            <array>
-                <string>AppIcon60x60</string>
-            </array>
         </dict>
         </plist>' > build/Payload/CardTracker.app/Info.plist
+
+        # Widget Extension Manifest
+        echo '<?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>CardTrackerWidget</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.premium.cardtracker.widget</string>
+            <key>CFBundleName</key>
+            <string>CardTrackerWidget</string>
+            <key>CFBundleShortVersionString</key>
+            <string>4.0</string>
+            <key>CFBundleVersion</key>
+            <string>4</string>
+            <key>MinimumOSVersion</key>
+            <string>17.0</string>
+            <key>NSExtension</key>
+            <dict>
+                <key>NSExtensionPointIdentifier</key>
+                <string>com.apple.widgetkit-extension</string>
+            </dict>
+        </dict>
+        </plist>' > build/Payload/CardTracker.app/PlugIns/CardTrackerWidget.appex/Info.plist
 
         cd build
         zip -r ../CardTracker.ipa Payload
 
-    - name: Upload Finished Production IPA
+    - name: Upload IPA Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: CardTracker-iOS26-Edition
+        name: CardTracker-With-Widget
         path: CardTracker.ipa
