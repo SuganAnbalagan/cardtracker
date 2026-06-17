@@ -21,10 +21,11 @@ jobs:
           -emit-executable \
           -parse-as-library
 
-    - name: Compile Widget Extension PlugIn
+    - name: Compile Widget Extension PlugIn Separately
       run: |
         mkdir -p build/Payload/CardTracker.app/PlugIns/CardTrackerWidget.appex
-        xcrun --sdk iphoneos swiftc Widget.swift App.swift \
+        # Compiled Widget.swift on its own to resolve duplicate '_main' linking errors
+        xcrun --sdk iphoneos swiftc Widget.swift \
           -target arm64-apple-ios17.0 \
           -o build/Payload/CardTracker.app/PlugIns/CardTrackerWidget.appex/CardTrackerWidget \
           -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
