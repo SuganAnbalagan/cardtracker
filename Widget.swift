@@ -25,8 +25,9 @@ struct Provider: TimelineProvider {
         completion(WidgetEntry(date: Date(), topCards: []))
     }
 
+    // Fixed: Added MainActor isolation so it has safe, verified permissions to read SwiftData
+    @MainActor
     func getTimeline(in context: Context, completion: @escaping (Timeline<WidgetEntry>) -> ()) {
-        // Reads from the shared SwiftData storage used by the main app
         let sharedContainer = try? ModelContainer(for: CreditCard.self)
         let descriptor = FetchDescriptor<CreditCard>()
         let cards = (try? sharedContainer?.mainContext.fetch(descriptor)) ?? []
@@ -47,7 +48,7 @@ struct CardWidgetEntryView : View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Top Durations")
-                .font(.system(size: 12, weight: .bold))
+                .font(.system(size: 11, weight: .black))
                 .foregroundColor(.secondary)
             
             if entry.topCards.isEmpty {
