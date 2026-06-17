@@ -1,0 +1,42 @@
+name: Build Unsigned iOS App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Install Tuist
+      run: curl -Ls https://install.tuist.io | sh
+
+    - name: Generate Xcode Project
+      run: tuist generate --no-open
+
+    - name: Build Unsigned App
+      run: |
+        xcodebuild archive \
+          -project CardTracker.xcodeproj \
+          -scheme CardTracker \
+          -configuration Release \
+          -archivePath ./build/CardTracker.xcarchive \
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGN_IDENTITY="" \
+          PROVISIONING_PROFILE_SPECIFIER=""
+
+    - name: Package App Bundle
+      run: |
+        mkdir -p Payload
+        cp -r build/CardTracker.xcarchive/Products/Applications/CardTracker.app Payload/
+        zip -r CardTracker.ipa Payload
+
+    - name: Upload Finished IPA Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CardTracker-Unsigned-IPA
+        path: CardTracker.ipa
