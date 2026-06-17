@@ -11,17 +11,12 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Install Tuist
-      run: curl -Ls https://install.tuist.io | sh
-
-    - name: Generate Xcode Project
-      run: tuist generate --no-open
-
     - name: Build Unsigned App
       run: |
         xcodebuild archive \
-          -project CardTracker.xcodeproj \
+          -packagePath . \
           -scheme CardTracker \
+          -destination "generic/platform=iOS" \
           -configuration Release \
           -archivePath ./build/CardTracker.xcarchive \
           CODE_SIGNING_ALLOWED=NO \
