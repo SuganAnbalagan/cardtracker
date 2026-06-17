@@ -10,21 +10,16 @@ jobs:
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
-
-    - name: Generate Native Project
-      run: |
-        xcrun --sdk iphoneos xcodebuild -clonedSourcePackagesDirPath . -resolvePackageDependencies || true
-        mkdir -p CardTracker.xcodeproj
-        echo '{"archiveVersion":1,"classes":{},"objectVersion":56,"objects":{},"rootObject":""}' > CardTracker.xcodeproj/project.pbxproj
         
-    - name: Alternate App Compiler
+    - name: Compile App Bundle Binary
       run: |
         mkdir -p build/Payload
         xcrun --sdk iphoneos swiftc App.swift \
           -target arm64-apple-ios15.0 \
           -o build/Payload/CardTracker \
           -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
-          -emit-executable
+          -emit-executable \
+          -parse-as-library
 
     - name: Package App Bundle Structure
       run: |
