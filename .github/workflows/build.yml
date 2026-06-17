@@ -24,12 +24,13 @@ jobs:
     - name: Compile Widget Extension PlugIn Separately
       run: |
         mkdir -p build/Payload/CardTracker.app/PlugIns/CardTrackerWidget.appex
-        # Included App.swift so it finds CreditCard, but forced Widget.swift to rule the entry execution
+        # Added -parse-as-library flag here to resolve duplicate symbol execution clashes
         xcrun --sdk iphoneos swiftc Widget.swift App.swift \
           -target arm64-apple-ios17.0 \
           -o build/Payload/CardTracker.app/PlugIns/CardTrackerWidget.appex/CardTrackerWidget \
           -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
-          -emit-executable
+          -emit-executable \
+          -parse-as-library
 
     - name: Package Metadata Profiles
       run: |
