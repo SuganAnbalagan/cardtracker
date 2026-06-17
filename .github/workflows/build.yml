@@ -14,23 +14,20 @@ jobs:
     - name: Compile Main App Binary
       run: |
         mkdir -p build/Payload/CardTracker.app
-        xcrun --sdk iphoneos swiftc App.swift \
+        xcrun --sdk iphoneos swiftc App.swift Model.swift \
           -target arm64-apple-ios17.0 \
           -o build/Payload/CardTracker.app/CardTracker \
           -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
-          -emit-executable \
-          -parse-as-library
+          -emit-executable
 
     - name: Compile Widget Extension PlugIn Separately
       run: |
         mkdir -p build/Payload/CardTracker.app/PlugIns/CardTrackerWidget.appex
-        # Added -parse-as-library flag here to resolve duplicate symbol execution clashes
-        xcrun --sdk iphoneos swiftc Widget.swift App.swift \
+        xcrun --sdk iphoneos swiftc Widget.swift Model.swift \
           -target arm64-apple-ios17.0 \
           -o build/Payload/CardTracker.app/PlugIns/CardTrackerWidget.appex/CardTrackerWidget \
           -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
-          -emit-executable \
-          -parse-as-library
+          -emit-executable
 
     - name: Package Metadata Profiles
       run: |
