@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
-import WidgetKit
 
+// MARK: - Main Application
 @main
 struct CardTrackerApp: App {
     var body: some Scene {
@@ -12,6 +12,7 @@ struct CardTrackerApp: App {
     }
 }
 
+// MARK: - Main Dashboard
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var cards: [CreditCard]
@@ -26,10 +27,6 @@ struct ContentView: View {
         cards.sorted { $0.daysUntilStatement > $1.daysUntilStatement }
     }
     
-    var topThreeCards: [CreditCard] {
-        Array(sortedCards.prefix(3))
-    }
-    
     var body: some View {
         NavigationView {
             ZStack {
@@ -39,6 +36,7 @@ struct ContentView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
+                        // Data Sync Controls
                         HStack(spacing: 16) {
                             Button(action: copyBackupToClipboard) {
                                 Label("Copy Backup", systemImage: "doc.on.doc.fill")
@@ -63,42 +61,7 @@ struct ContentView: View {
                         .padding(.horizontal)
                         .padding(.top, 8)
                         
-                        if !topThreeCards.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Image(systemName: "square.text.square.fill")
-                                        .foregroundColor(.cyan)
-                                    Text("TOP 3 DURATION WIDGET")
-                                        .font(.system(size: 12, weight: .black))
-                                        .foregroundColor(.white.opacity(0.6))
-                                    Spacer()
-                                }
-                                .padding(.horizontal, 4)
-                                
-                                VStack(spacing: 10) {
-                                    ForEach(topThreeCards) { card in
-                                        HStack {
-                                            Text(card.name)
-                                                .font(.system(size: 14, weight: .bold))
-                                                .foregroundColor(.white)
-                                            Spacer()
-                                            Text("\(card.daysUntilStatement) days left")
-                                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                                .foregroundColor(.cyan)
-                                        }
-                                        .padding(.vertical, 4)
-                                        if card.id != topThreeCards.last?.id {
-                                            Divider().background(Color.white.opacity(0.1))
-                                        }
-                                    }
-                                }
-                                .padding()
-                                .background(Color.black.opacity(0.25))
-                                .cornerRadius(16)
-                            }
-                            .padding(.horizontal)
-                        }
-                        
+                        // Action Button Placement
                         Button(action: { showingAddSheet = true }) {
                             HStack {
                                 Image(systemName: "plus.circle.fill")
@@ -116,6 +79,7 @@ struct ContentView: View {
                         }
                         .padding(.horizontal)
                         
+                        // List Entries Container
                         if sortedCards.isEmpty {
                             VStack(spacing: 12) {
                                 Image(systemName: "creditcard")
@@ -125,7 +89,7 @@ struct ContentView: View {
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundColor(.white.opacity(0.4))
                             }
-                            .padding(.top, 40)
+                            .padding(.top, 80)
                         } else {
                             VStack(spacing: 16) {
                                 ForEach(sortedCards) { card in
@@ -181,6 +145,7 @@ struct ContentView: View {
     }
 }
 
+// MARK: - Card Component Row View
 struct GlassmorphicCardView: View {
     let card: CreditCard
     @Environment(\.modelContext) private var modelContext
@@ -226,6 +191,7 @@ struct GlassmorphicCardView: View {
     }
 }
 
+// MARK: - Modernized Form Module View
 struct AddCardView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) private var modelContext
