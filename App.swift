@@ -1,9 +1,18 @@
 import SwiftUI
+import SwiftData
+import WidgetKit
 
-struct CreditCard: Identifiable, Codable {
-    var id = UUID()
-    let name: String
-    let statementDay: Int
+// MARK: - Data Model with iCloud Support
+@Model
+final class CreditCard: Identifiable {
+    var id: UUID = UUID()
+    var name: String = ""
+    var statementDay: Int = 1
+    
+    init(name: String, statementDay: Int) {
+        self.name = name
+        self.statementDay = statementDay
+    }
     
     var daysUntilStatement: Int {
         let calendar = Calendar.current
@@ -21,103 +30,137 @@ struct CreditCard: Identifiable, Codable {
         
         let startOfToday = calendar.startOfDay(for: now)
         let startOfTarget = calendar.startOfDay(for: targetDate)
-        let components = calendar.dateComponents([.day], from: startOfToday, to: startOfTarget)
-        
-        return components.day ?? 0
+        return calendar.dateComponents([.day], from: startOfToday, to: startOfTarget).day ?? 0
     }
 }
 
-class CardViewModel: ObservableObject {
-    @Published var cards: [CreditCard] = [] {
-        didSet {
-            saveCards()
+// MARK: - Main Application Entry Point
+@main
+struct CardTrackerApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
         }
+        .modelContainer(for: CreditCard.self) // Automatically links database to iCloud container
     }
-    
-    init() {
-        loadCards()
-    }
+}
+
+// MARK: - Fluid UI View Dashboard
+struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \CreditCard.statementDay, order: .reverse) private var cards: [CreditCard]
+    @State private var showingAddSheet = false
     
     var sortedCards: [CreditCard] {
         cards.sorted { $0.daysUntilStatement > $1.daysUntilStatement }
     }
     
-    func addCard(name: String, day: Int) {
-        let newCard = CreditCard(name: name, statementDay: day)
-        cards.append(newCard)
-    }
-    
-    func deleteCard(at offsets: IndexSet) {
-        let sorted = sortedCards
-        for index in offsets {
-            let cardToDelete = sorted[index]
-            cards.removeAll { $0.id == cardToDelete.id }
-        }
-    }
-    
-    private func saveCards() {
-        if let encoded = try? JSONEncoder().encode(cards) {
-            UserDefaults.standard.set(encoded, forKey: "SavedCards")
-        }
-    }
-    
-    private func loadCards() {
-        if let data = UserDefaults.standard.data(forKey: "SavedCards"),
-           let decoded = try? JSONDecoder().decode([CreditCard].self, from: data) {
-            self.cards = decoded
-        }
-    }
-}
-
-struct ContentView: View {
-    @StateObject private var viewModel = CardViewModel()
-    @State private var showingAddSheet = false
-    
     var body: some View {
         NavigationView {
-            List {
-                ForEach(viewModel.sortedCards) { card in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(card.name)
-                                .font(.headline)
-                            Text("Statement Day: \(card.statementDay)")
+            ZStack {
+                // Liquid Glass Style Mesh Background
+                LinearGradient(colors: [Color.indigo.opacity(0.6), Color.purple.opacity(0.4), Color.black], 
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                    .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 16) {
+                        if sortedCards.isEmpty {
+                            Text("No Cards Added Yet")
                                 .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing) {
-                            Text("\(card.daysUntilStatement) days")
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .foregroundColor(.blue)
-                            Text("remaining")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.white.opacity(0.6))
+                                .padding(.top, 100)
+                        } else {
+                            ForEach(sortedCards) { card in
+                                GlassmorphicCardView(card: card)
+                            }
+                            .onDelete(perform: deleteCard)
                         }
                     }
-                    .padding(.vertical, 4)
+                    .padding()
                 }
-                .onDelete(perform: viewModel.deleteCard)
             }
             .navigationTitle("Card Tracker")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingAddSheet = true }) {
-                        Image(systemName: "plus")
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
                     }
                 }
             }
             .sheet(isPresented: $showingAddSheet) {
-                AddCardView(viewModel: viewModel)
+                AddCardView()
             }
         }
     }
+    
+    private func deleteCard(at offsets: IndexSet) {
+        for index in offsets {
+            let cardToDelete = sortedCards[index]
+            modelContext.delete(cardToDelete)
+        }
+        WidgetCenter.shared.reloadAllTimelines() // Refresh layout widgets immediately
+    }
 }
 
+// MARK: - Glassmorphic Fluid Design View
+struct GlassmorphicCardView: View {
+    let card: CreditCard
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(card.name)
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                Text("Statement Day: \(card.statementDay)")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            Spacer()
+            VStack(alignment: .trailing) {
+                Text("\(card.daysUntilStatement)")
+                    .font(.system(size: 32, weight: .heavy, design: .rounded))
+                    .foregroundColor(.cyan)
+                Text("days remaining")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white.opacity(0.8))
+            }
+        }
+        .padding()
+        // Layered Frosted Background Filters
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.white.opacity(0.08))
+                .background(VisualEffectBlur(material: .systemUltraThinMaterial, blendingMode: .withinWindow))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(LinearGradient(colors: [.white.opacity(0.3), .clear], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
+                )
+        )
+        .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 10)
+    }
+}
+
+// Native visual background element wrapper
+struct VisualEffectBlur: UIViewRepresentable {
+    var material: UIBlurEffect.Material
+    var blendingMode: UIVisualEffectView.BackgroundBlendingMode
+    
+    func makeUIView(context: Context) -> UIVisualEffectView {
+        let view = UIVisualEffectView(effect: UIBlurEffect(style: material))
+        return view
+    }
+    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
+}
+
+// MARK: - Modular Add Card Form
 struct AddCardView: View {
     @Environment(\.dismiss) var dismiss
-    @ObservedObject var viewModel: CardViewModel
+    @Environment(\.modelContext) private var modelContext
     
     @State private var cardName = ""
     @State private var statementDay = 1
@@ -125,40 +168,30 @@ struct AddCardView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Card Details")) {
-                    TextField("Card Name", text: $cardName)
-                    
-                    Picker("Statement Day", selection: $statementDay) {
+                Section(header: Text("Card Configuration")) {
+                    TextField("Card Provider Name", text: $cardName)
+                    Picker("Closing Day", selection: $statementDay) {
                         ForEach(1...31, id: \.self) { day in
                             Text("\(day)").tag(day)
                         }
                     }
                 }
             }
-            .navigationTitle("Add New Card")
+            .navigationTitle("New Card Configuration")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button("Dismiss") { dismiss() }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        if !cardName.isEmpty {
-                            viewModel.addCard(name: cardName, day: statementDay)
-                            dismiss()
-                        }
+                        let newCard = CreditCard(name: cardName, statementDay: statementDay)
+                        modelContext.insert(newCard)
+                        WidgetCenter.shared.reloadAllTimelines()
+                        dismiss()
                     }
                     .disabled(cardName.isEmpty)
                 }
             }
-        }
-    }
-}
-
-@main
-struct CardTrackerApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
         }
     }
 }
