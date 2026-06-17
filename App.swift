@@ -39,7 +39,7 @@ struct ContentView: View {
                         // Data Sync Controls
                         HStack(spacing: 16) {
                             Button(action: copyBackupToClipboard) {
-                                Label("Copy Backup", systemImage: "doc.on.doc.fill")
+                                Label("Backup", systemImage: "doc.on.doc.fill")
                                     .font(.system(size: 14, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -49,7 +49,7 @@ struct ContentView: View {
                             }
                             
                             Button(action: { showingRestoreAlert = true }) {
-                                Label("Paste Restore", systemImage: "doc.text.magnifyingglass")
+                                Label("Restore", systemImage: "doc.text.magnifyingglass")
                                     .font(.system(size: 14, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
