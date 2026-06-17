@@ -41,14 +41,14 @@ struct CardTrackerApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: CreditCard.self) // Automatically links database to iCloud container
+        .modelContainer(for: CreditCard.self)
     }
 }
 
 // MARK: - Fluid UI View Dashboard
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \CreditCard.statementDay, order: .reverse) private var cards: [CreditCard]
+    @Query private var cards: [CreditCard]
     @State private var showingAddSheet = false
     
     var sortedCards: [CreditCard] {
@@ -74,7 +74,6 @@ struct ContentView: View {
                             ForEach(sortedCards) { card in
                                 GlassmorphicCardView(card: card)
                             }
-                            .onDelete(perform: deleteCard)
                         }
                     }
                     .padding()
@@ -95,19 +94,12 @@ struct ContentView: View {
             }
         }
     }
-    
-    private func deleteCard(at offsets: IndexSet) {
-        for index in offsets {
-            let cardToDelete = sortedCards[index]
-            modelContext.delete(cardToDelete)
-        }
-        WidgetCenter.shared.reloadAllTimelines() // Refresh layout widgets immediately
-    }
 }
 
 // MARK: - Glassmorphic Fluid Design View
 struct GlassmorphicCardView: View {
     let card: CreditCard
+    @Environment(\.modelContext) private var modelContext
     
     var body: some View {
         HStack {
@@ -129,32 +121,27 @@ struct GlassmorphicCardView: View {
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.white.opacity(0.8))
             }
+            
+            // Delete Button inside row
+            Button(action: {
+                modelContext.delete(card)
+                WidgetCenter.shared.reloadAllTimelines()
+            }) {
+                Image(systemName: "trash")
+                    .foregroundColor(.red.opacity(0.8))
+                    .padding(.leading, 8)
+            }
         }
         .padding()
-        // Layered Frosted Background Filters
-        .background(
+        // Clean native iOS 17 Ultra Thin Glassmorphism
+        .background(.ultraThinMaterial)
+        .cornerRadius(20)
+        .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .fill(Color.white.opacity(0.08))
-                .background(VisualEffectBlur(material: .systemUltraThinMaterial, blendingMode: .withinWindow))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(LinearGradient(colors: [.white.opacity(0.3), .clear], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
-                )
+                .stroke(LinearGradient(colors: [.white.opacity(0.3), .clear], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 10)
     }
-}
-
-// Native visual background element wrapper
-struct VisualEffectBlur: UIViewRepresentable {
-    var material: UIBlurEffect.Material
-    var blendingMode: UIVisualEffectView.BackgroundBlendingMode
-    
-    func makeUIView(context: Context) -> UIVisualEffectView {
-        let view = UIVisualEffectView(effect: UIBlurEffect(style: material))
-        return view
-    }
-    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {}
 }
 
 // MARK: - Modular Add Card Form
