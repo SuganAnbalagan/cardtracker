@@ -1,7 +1,6 @@
 import SwiftUI
 import SwiftData
 import WidgetKit
-import UniformTypeIdentifiers
 
 // MARK: - Data Model
 @Model
@@ -35,16 +34,12 @@ final class CreditCard: Identifiable, Codable {
         let calendar = Calendar.current
         let now = Date()
         let currentComponents = calendar.dateComponents([.year, .month, .day], from: now)
-        
         var targetComponents = currentComponents
         targetComponents.day = statementDay
-        
         if let currentDay = currentComponents.day, currentDay > statementDay {
             targetComponents.month = (targetComponents.month ?? 1) + 1
         }
-        
         guard let targetDate = calendar.date(from: targetComponents) else { return 0 }
-        
         let startOfToday = calendar.startOfDay(for: now)
         let startOfTarget = calendar.startOfDay(for: targetDate)
         return calendar.dateComponents([.day], from: startOfToday, to: startOfTarget).day ?? 0
@@ -68,9 +63,11 @@ struct ContentView: View {
     @Query private var cards: [CreditCard]
     @State private var showingAddSheet = false
     
-    @State private var exportDocument: CardBackupDocument?
-    @State private var isExporting = false
-    @State private var isImporting = false
+    // Text migration modal states
+    @State private var showingRestoreAlert = false
+    @State private var inputBackupString = ""
+    @State private var showingSuccessAlert = false
+    @State private var alertMessage = ""
     
     var sortedCards: [CreditCard] {
         cards.sorted { $0.daysUntilStatement > $1.daysUntilStatement }
@@ -85,38 +82,38 @@ struct ContentView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // 1. Aligned Backup and Restore Buttons
+                        // 1. Perfectly Aligned Backup and Restore Buttons
                         HStack(spacing: 16) {
-                            Button(action: triggerBackup) {
+                            Button(action: copyBackupToClipboard) {
                                 HStack {
-                                    Image(systemName: "square.and.arrow.up")
-                                    Text("Backup")
+                                    Image(systemName: "doc.on.doc.fill")
+                                    Text("Copy Backup")
                                 }
-                                .font(.system(size: 16, weight: .bold))
+                                .font(.system(size: 15, weight: .bold))
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 44)
-                                .background(Color.white.opacity(0.15))
-                                .cornerRadius(12)
+                                .frame(height: 46)
+                                .background(Color.white.opacity(0.12))
+                                .cornerRadius(14)
                             }
                             
-                            Button(action: { isImporting = true }) {
+                            Button(action: { showingRestoreAlert = true }) {
                                 HStack {
-                                    Image(systemName: "square.and.arrow.down")
-                                    Text("Restore")
+                                    Image(systemName: "doc.text.magnifyingglass")
+                                    Text("Paste Restore")
                                 }
-                                .font(.system(size: 16, weight: .bold))
+                                .font(.system(size: 15, weight: .bold))
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 44)
-                                .background(Color.white.opacity(0.15))
-                                .cornerRadius(12)
+                                .frame(height: 46)
+                                .background(Color.white.opacity(0.12))
+                                .cornerRadius(14)
                             }
                         }
                         .padding(.horizontal)
                         .padding(.top, 8)
                         
-                        // 2. Add New Card Button Placed Directly Below Controls
+                        // 2. Modern Styled Add New Card Button Placement
                         Button(action: { showingAddSheet = true }) {
                             HStack {
                                 Image(systemName: "plus.circle.fill")
@@ -125,27 +122,26 @@ struct ContentView: View {
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(Color.blue.opacity(0.4))
-                            .cornerRadius(14)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            .frame(height: 52)
+                            .background(
+                                LinearGradient(colors: [Color.cyan, Color.blue], startPoint: .leading, endPoint: .trailing)
                             )
+                            .cornerRadius(16)
+                            .shadow(color: Color.blue.opacity(0.3), radius: 8, x: 0, y: 4)
                         }
                         .padding(.horizontal)
                         
-                        // 3. Card Display Area
+                        // 3. Dynamic Card Stack Display
                         if sortedCards.isEmpty {
                             VStack(spacing: 12) {
-                                Image(systemName: "creditcard.and.123")
-                                    .font(.system(size: 48))
-                                    .foregroundColor(.white.opacity(0.3))
-                                Text("No Cards Added Yet")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.5))
+                                Image(systemName: "creditcard")
+                                    .font(.system(size: 54))
+                                    .foregroundColor(.white.opacity(0.2))
+                                Text("No Cards Tracked")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.4))
                             }
-                            .padding(.top, 60)
+                            .padding(.top, 80)
                         } else {
                             VStack(spacing: 16) {
                                 ForEach(sortedCards) { card in
@@ -160,75 +156,51 @@ struct ContentView: View {
             }
             .navigationTitle("Card Tracker")
             .sheet(isPresented: $showingAddSheet) { AddCardView() }
-            .fileExporter(isPresented: $isExporting, document: exportDocument, contentType: .json, defaultFilename: "CardTrackerBackup") { result in
-                if case .failure(let error) = result { print("Export Error: \(error.localizedDescription)") }
+            // Custom text processing dialogue modals
+            .alert("Paste Restore Data", isPresented: $showingRestoreAlert) {
+                TextField("Paste backup code here", text: $inputBackupString)
+                Button("Cancel", role: .cancel) { inputBackupString = "" }
+                Button("Restore Data") { processRestoreString() }
+            } message: {
+                Text("Paste the string code you copied earlier to restore your card list configuration.")
             }
-            .fileImporter(isPresented: $isImporting, allowedContentTypes: [.json], allowsMultipleSelection: false) { result in
-                switch result {
-                case .success(let urls):
-                    guard let url = urls.first else { return }
-                    importBackup(from: url)
-                case .failure(let error):
-                    print("Import Error: \(error.localizedDescription)")
-                }
+            .alert("Notice", isPresented: $showingSuccessAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(alertMessage)
             }
         }
     }
     
-    private func triggerBackup() {
-        if let data = try? JSONEncoder().encode(cards) {
-            exportDocument = CardBackupDocument(data: data)
-            isExporting = true
+    private func copyBackupToClipboard() {
+        if let data = try? JSONEncoder().encode(cards),
+           let jsonString = String(data: data, encoding: .utf8) {
+            UIPasteboard.general.string = jsonString
+            alertMessage = "Your cards database backup string has been copied safely to your Clipboard! Save it anywhere in Notes or an Email."
+            showingSuccessAlert = true
         }
     }
     
-    private func importBackup(from url: URL) {
-        guard url.startAccessingSecurityScopedResource() else { return }
-        // Ensure the security scope is closed cleanly after reading the file
-        defer { url.stopAccessingSecurityScopedResource() }
-        
+    private func processRestoreString() {
+        guard !inputBackupString.isEmpty,
+              let data = inputBackupString.data(using: .utf8) else { return }
         do {
-            let data = try Data(contentsOf: url)
             let importedCards = try JSONDecoder().decode([CreditCard].self, from: data)
-            
-            // Clean up existing context storage entries before replacing
-            for card in cards {
-                modelContext.delete(card)
-            }
-            
-            // Insert and save newly selected elements inside your database context container
-            for newCard in importedCards {
-                modelContext.insert(newCard)
-            }
-            
+            for card in cards { modelContext.delete(card) }
+            for newCard in importedCards { modelContext.insert(newCard) }
             try modelContext.save()
             WidgetCenter.shared.reloadAllTimelines()
+            inputBackupString = ""
+            alertMessage = "Database Restored Successfully!"
+            showingSuccessAlert = true
         } catch {
-            print("Failed to read or decode backup package file contents: \(error)")
+            alertMessage = "Invalid backup code string. Please verify and try again."
+            showingSuccessAlert = true
         }
     }
 }
 
-// MARK: - Backup Document Native Wrapper File
-struct CardBackupDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.json] }
-    var data: Data
-
-    init(data: Data) { self.data = data }
-    init(configuration: ReadConfiguration) throws { 
-        if let data = configuration.file.regularFileContents {
-            self.data = data
-        } else {
-            self.data = Data()
-        }
-    }
-
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: data)
-    }
-}
-
-// MARK: - Glassmorphic Fluid Design View
+// MARK: - Premium Glassmorphic Card View Row
 struct GlassmorphicCardView: View {
     let card: CreditCard
     @Environment(\.modelContext) private var modelContext
@@ -242,39 +214,40 @@ struct GlassmorphicCardView: View {
                     .foregroundColor(.white)
                 Text("Statement Day: \(card.statementDay)")
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(.white.opacity(0.6))
             }
             Spacer()
-            VStack(alignment: .trailing) {
+            VStack(alignment: .trailing, spacing: 2) {
                 Text("\(card.daysUntilStatement)")
-                    .font(.system(size: 32, weight: .heavy, design: .rounded))
+                    .font(.system(size: 34, weight: .black, design: .rounded))
                     .foregroundColor(.cyan)
-                Text("days remaining")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
+                Text("days left")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white.opacity(0.7))
             }
+            .padding(.trailing, 8)
             
             Button(action: {
                 modelContext.delete(card)
                 WidgetCenter.shared.reloadAllTimelines()
             }) {
-                Image(systemName: "trash")
-                    .foregroundColor(.red.opacity(0.8))
-                    .padding(.leading, 8)
+                Image(systemName: "trash.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.red.opacity(0.7))
             }
         }
         .padding()
+        .background(.white.opacity(0.07))
         .background(.ultraThinMaterial)
-        .cornerRadius(20)
+        .cornerRadius(22)
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(LinearGradient(colors: [.white.opacity(0.3), .clear], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 22)
+                .stroke(LinearGradient(colors: [.white.opacity(0.25), .clear], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 10)
     }
 }
 
-// MARK: - Modular Add Card Form
+// MARK: - Premium iOS 26 Glassmorphic Add Form
 struct AddCardView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -283,31 +256,68 @@ struct AddCardView: View {
     @State private var statementDay = 1
     
     var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Card Configuration")) {
-                    TextField("Card Provider Name", text: $cardName)
-                    Picker("Closing Day", selection: $statementDay) {
-                        ForEach(1...31, id: \.self) { day in
-                            Text("\(day)").tag(day)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("New Card Configuration")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Dismiss") { dismiss() }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
+        ZStack {
+            // Replaces the standard white form with the liquid mesh theme
+            LinearGradient(colors: [Color.indigo.opacity(0.5), Color.black], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 28) {
+                // Frosted Title Area Bar
+                HStack {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(.white.opacity(0.7))
+                    Spacer()
+                    Text("New Configuration")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    Spacer()
                     Button("Save") {
                         let newCard = CreditCard(name: cardName, statementDay: statementDay)
                         modelContext.insert(newCard)
                         WidgetCenter.shared.reloadAllTimelines()
                         dismiss()
                     }
+                    .font(.headline)
+                    .foregroundColor(.cyan)
                     .disabled(cardName.isEmpty)
                 }
+                .padding()
+                .background(.white.opacity(0.05))
+                
+                VStack(spacing: 20) {
+                    // Glass input field wrapper
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Card Designation Name")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white.opacity(0.6))
+                        TextField("", text: $cardName, prompt: Text("e.g. Sapphire Preferred").foregroundColor(.white.opacity(0.3)))
+                            .padding()
+                            .foregroundColor(.white)
+                            .background(Color.white.opacity(0.08))
+                            .cornerRadius(14)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Statement Cycle End Day")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white.opacity(0.6))
+                        
+                        Picker("Closing Day", selection: $statementDay) {
+                            ForEach(1...31, id: \.self) { day in
+                                Text("Every Day \(day)").tag(day)
+                            }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(height: 120)
+                        .background(Color.white.opacity(0.08))
+                        .cornerRadius(14)
+                    }
+                }
+                .padding(.horizontal)
+                
+                Spacer()
             }
         }
     }
