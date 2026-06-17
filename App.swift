@@ -57,13 +57,12 @@ struct CardTrackerApp: App {
     }
 }
 
-// MARK: - Fluid UI View Dashboard
+// MARK: - Main Dashboard
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var cards: [CreditCard]
     @State private var showingAddSheet = false
     
-    // Text migration modal states
     @State private var showingRestoreAlert = false
     @State private var inputBackupString = ""
     @State private var showingSuccessAlert = false
@@ -71,6 +70,11 @@ struct ContentView: View {
     
     var sortedCards: [CreditCard] {
         cards.sorted { $0.daysUntilStatement > $1.daysUntilStatement }
+    }
+    
+    // Grabs top 3 longest duration cards for the internal widget panel
+    var topThreeCards: [CreditCard] {
+        Array(sortedCards.prefix(3))
     }
     
     var body: some View {
@@ -82,38 +86,69 @@ struct ContentView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // 1. Perfectly Aligned Backup and Restore Buttons
+                        // Data Sync Controls
                         HStack(spacing: 16) {
                             Button(action: copyBackupToClipboard) {
-                                HStack {
-                                    Image(systemName: "doc.on.doc.fill")
-                                    Text("Copy Backup")
-                                }
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 46)
-                                .background(Color.white.opacity(0.12))
-                                .cornerRadius(14)
+                                Label("Copy Backup", systemImage: "doc.on.doc.fill")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 44)
+                                    .background(Color.white.opacity(0.12))
+                                    .cornerRadius(14)
                             }
                             
                             Button(action: { showingRestoreAlert = true }) {
-                                HStack {
-                                    Image(systemName: "doc.text.magnifyingglass")
-                                    Text("Paste Restore")
-                                }
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 46)
-                                .background(Color.white.opacity(0.12))
-                                .cornerRadius(14)
+                                Label("Paste Restore", systemImage: "doc.text.magnifyingglass")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 44)
+                                    .background(Color.white.opacity(0.12))
+                                    .cornerRadius(14)
                             }
                         }
                         .padding(.horizontal)
                         .padding(.top, 8)
                         
-                        // 2. Modern Styled Add New Card Button Placement
+                        // Integrated Premium Home Screen Widget (Top 3 Live Panel)
+                        if !topThreeCards.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Image(systemName: "square.text.square.fill")
+                                        .foregroundColor(.cyan)
+                                    Text("TOP 3 DURATION WIDGET")
+                                        .font(.system(size: 12, weight: .black))
+                                        .foregroundColor(.white.opacity(0.6))
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 4)
+                                
+                                VStack(spacing: 10) {
+                                    ForEach(topThreeCards) { card in
+                                        HStack {
+                                            Text(card.name)
+                                                .font(.system(size: 14, weight: .bold))
+                                                .foregroundColor(.white)
+                                            Spacer()
+                                            Text("\(card.daysUntilStatement) days left")
+                                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                                .foregroundColor(.cyan)
+                                        }
+                                        .padding(.vertical, 4)
+                                        if card.id != topThreeCards.last?.id {
+                                            Divider().background(Color.white.opacity(0.1))
+                                        }
+                                    }
+                                }
+                                .padding()
+                                .background(Color.black.opacity(0.25))
+                                .cornerRadius(16)
+                            }
+                            .padding(.horizontal)
+                        }
+                        
+                        // Action Button Placement
                         Button(action: { showingAddSheet = true }) {
                             HStack {
                                 Image(systemName: "plus.circle.fill")
@@ -131,7 +166,7 @@ struct ContentView: View {
                         }
                         .padding(.horizontal)
                         
-                        // 3. Dynamic Card Stack Display
+                        // List Entries Container
                         if sortedCards.isEmpty {
                             VStack(spacing: 12) {
                                 Image(systemName: "creditcard")
@@ -141,7 +176,7 @@ struct ContentView: View {
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundColor(.white.opacity(0.4))
                             }
-                            .padding(.top, 80)
+                            .padding(.top, 40)
                         } else {
                             VStack(spacing: 16) {
                                 ForEach(sortedCards) { card in
@@ -156,13 +191,12 @@ struct ContentView: View {
             }
             .navigationTitle("Card Tracker")
             .sheet(isPresented: $showingAddSheet) { AddCardView() }
-            // Custom text processing dialogue modals
             .alert("Paste Restore Data", isPresented: $showingRestoreAlert) {
                 TextField("Paste backup code here", text: $inputBackupString)
                 Button("Cancel", role: .cancel) { inputBackupString = "" }
                 Button("Restore Data") { processRestoreString() }
             } message: {
-                Text("Paste the string code you copied earlier to restore your card list configuration.")
+                Text("Paste your backup string code to replace your tracking configurations.")
             }
             .alert("Notice", isPresented: $showingSuccessAlert) {
                 Button("OK", role: .cancel) {}
@@ -176,31 +210,29 @@ struct ContentView: View {
         if let data = try? JSONEncoder().encode(cards),
            let jsonString = String(data: data, encoding: .utf8) {
             UIPasteboard.general.string = jsonString
-            alertMessage = "Your cards database backup string has been copied safely to your Clipboard! Save it anywhere in Notes or an Email."
+            alertMessage = "Cards backup code string copied to clipboard!"
             showingSuccessAlert = true
         }
     }
     
     private func processRestoreString() {
-        guard !inputBackupString.isEmpty,
-              let data = inputBackupString.data(using: .utf8) else { return }
+        guard !inputBackupString.isEmpty, let data = inputBackupString.data(using: .utf8) else { return }
         do {
             let importedCards = try JSONDecoder().decode([CreditCard].self, from: data)
             for card in cards { modelContext.delete(card) }
             for newCard in importedCards { modelContext.insert(newCard) }
             try modelContext.save()
-            WidgetCenter.shared.reloadAllTimelines()
             inputBackupString = ""
             alertMessage = "Database Restored Successfully!"
             showingSuccessAlert = true
         } catch {
-            alertMessage = "Invalid backup code string. Please verify and try again."
+            alertMessage = "Invalid verification code string profile."
             showingSuccessAlert = true
         }
     }
 }
 
-// MARK: - Premium Glassmorphic Card View Row
+// MARK: - Card Component Row Row View
 struct GlassmorphicCardView: View {
     let card: CreditCard
     @Environment(\.modelContext) private var modelContext
@@ -212,7 +244,7 @@ struct GlassmorphicCardView: View {
                     .font(.title3)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
-                Text("Statement Day: \(card.statementDay)")
+                Text("Statement Date: \(card.statementDay)")
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.6))
             }
@@ -229,7 +261,6 @@ struct GlassmorphicCardView: View {
             
             Button(action: {
                 modelContext.delete(card)
-                WidgetCenter.shared.reloadAllTimelines()
             }) {
                 Image(systemName: "trash.circle.fill")
                     .font(.title2)
@@ -247,7 +278,7 @@ struct GlassmorphicCardView: View {
     }
 }
 
-// MARK: - Premium iOS 26 Glassmorphic Add Form
+// MARK: - Modernized Form Module View
 struct AddCardView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -257,12 +288,10 @@ struct AddCardView: View {
     
     var body: some View {
         ZStack {
-            // Replaces the standard white form with the liquid mesh theme
             LinearGradient(colors: [Color.indigo.opacity(0.5), Color.black], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
             
             VStack(spacing: 28) {
-                // Frosted Title Area Bar
                 HStack {
                     Button("Cancel") { dismiss() }
                         .foregroundColor(.white.opacity(0.7))
@@ -274,7 +303,6 @@ struct AddCardView: View {
                     Button("Save") {
                         let newCard = CreditCard(name: cardName, statementDay: statementDay)
                         modelContext.insert(newCard)
-                        WidgetCenter.shared.reloadAllTimelines()
                         dismiss()
                     }
                     .font(.headline)
@@ -284,12 +312,11 @@ struct AddCardView: View {
                 .padding()
                 .background(.white.opacity(0.05))
                 
-                VStack(spacing: 20) {
-                    // Glass input field wrapper
+                VStack(spacing: 24) {
+                    // Changed Label from "Card Designation Name" to "Card Name"
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Card Designation Name")
-                            .font(.caption)
-                            .fontWeight(.bold)
+                        Text("Card Name")
+                            .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.white.opacity(0.6))
                         TextField("", text: $cardName, prompt: Text("e.g. Sapphire Preferred").foregroundColor(.white.opacity(0.3)))
                             .padding()
@@ -298,19 +325,20 @@ struct AddCardView: View {
                             .cornerRadius(14)
                     }
                     
+                    // Changed Label from "Statement Cycle End Day" to "Statement Date"
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Statement Cycle End Day")
-                            .font(.caption)
-                            .fontWeight(.bold)
+                        Text("Statement Date")
+                            .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.white.opacity(0.6))
                         
                         Picker("Closing Day", selection: $statementDay) {
                             ForEach(1...31, id: \.self) { day in
-                                Text("Every Day \(day)").tag(day)
+                                // Removed the "Every Day" string injection prefix
+                                Text("\(day)").tag(day)
                             }
                         }
                         .pickerStyle(.wheel)
-                        .frame(height: 120)
+                        .frame(height: 140)
                         .background(Color.white.opacity(0.08))
                         .cornerRadius(14)
                     }
