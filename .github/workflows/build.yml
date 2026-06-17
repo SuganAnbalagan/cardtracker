@@ -11,7 +11,7 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
         
-    - name: Compile App Binary with Frameworks
+    - name: Compile App Binary with Modern Frameworks
       run: |
         mkdir -p build/Payload/CardTracker.app
         xcrun --sdk iphoneos swiftc App.swift \
@@ -21,9 +21,10 @@ jobs:
           -emit-executable \
           -parse-as-library
 
-    - name: Generate High Resolution App Icons
+    - name: Generate Premium Custom Metallic App Icon
       run: |
-        mkdir -p build/Payload/CardTracker.app/Assets
+        # Injects a sleek deep slate blue layered application icon bundle
+        mkdir -p build/Payload/CardTracker.app
         /usr/bin/swift -e '
         import Foundation
         import CoreImage
@@ -33,8 +34,8 @@ jobs:
         if let filter = CIFilter(name: "CILinearGradient") {
             filter.setValue(CIVector(x: 0, y: 0), forKey: "inputPoint0")
             filter.setValue(CIVector(x: 1024, y: 1024), forKey: "inputPoint1")
-            filter.setValue(CIColor(red: 0.1, green: 0.1, blue: 0.3), forKey: "inputColor0")
-            filter.setValue(CIColor(red: 0.3, green: 0.0, blue: 0.5), forKey: "inputColor1")
+            filter.setValue(CIColor(red: 0.08, green: 0.08, blue: 0.18), forKey: "inputColor0")
+            filter.setValue(CIColor(red: 0.15, green: 0.35, blue: 0.60), forKey: "inputColor1")
             if let output = filter.outputImage?.cropped(to: CGRect(x: 0, y: 0, width: 1024, height: 1024)) {
                 if let cgImage = ctx.createCGImage(output, from: output.extent) {
                     let rep = NSBitmapImageRep(cgImage: cgImage)
@@ -46,7 +47,7 @@ jobs:
             }
         }'
 
-    - name: Package App Bundle Metadata and Core Entitlements
+    - name: Inject Metadata Configuration Packages
       run: |
         echo '<?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -55,13 +56,13 @@ jobs:
             <key>CFBundleExecutable</key>
             <string>CardTracker</string>
             <key>CFBundleIdentifier</key>
-            <string>com.yourname.cardtracker</string>
+            <string>com.premium.cardtracker</string>
             <key>CFBundleName</key>
             <string>CardTracker</string>
             <key>CFBundleShortVersionString</key>
-            <string>2.0</string>
+            <string>3.0</string>
             <key>CFBundleVersion</key>
-            <string>2</string>
+            <string>3</string>
             <key>MinimumOSVersion</key>
             <string>17.0</string>
             <key>UIRequiredDeviceCapabilities</key>
@@ -75,28 +76,11 @@ jobs:
         </dict>
         </plist>' > build/Payload/CardTracker.app/Info.plist
 
-        echo '<?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>com.apple.developer.icloud-container-identifiers</key>
-            <array>
-                <string>iCloud.com.yourname.cardtracker</string>
-            </array>
-            <key>com.apple.developer.icloud-services</key>
-            <array>
-                <string>CloudKit</string>
-            </array>
-            <key>com.apple.developer.ubiquity-kvstore-identifier</key>
-            <string>com.yourname.cardtracker</string>
-        </dict>
-        </plist>' > build/entitlements.plist
-
         cd build
-        zip -r ../CardTracker.ipa Payload entitlements.plist
+        zip -r ../CardTracker.ipa Payload
 
-    - name: Upload Finished IPA Artifact
+    - name: Upload Finished Production IPA
       uses: actions/upload-artifact@v4
       with:
-        name: CardTracker-Premium-Unsigned-IPA
+        name: CardTracker-iOS26-Edition
         path: CardTracker.ipa
