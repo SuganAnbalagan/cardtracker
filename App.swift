@@ -2,51 +2,6 @@ import SwiftUI
 import SwiftData
 import WidgetKit
 
-// MARK: - Data Model
-@Model
-final class CreditCard: Identifiable, Codable {
-    var id: UUID = UUID()
-    var name: String = ""
-    var statementDay: Int = 1
-    
-    init(name: String, statementDay: Int) {
-        self.name = name
-        self.statementDay = statementDay
-    }
-    
-    enum CodingKeys: CodingKey { case id, name, statementDay }
-    
-    required init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = try container.decode(UUID.self, forKey: .id)
-        self.name = try container.decode(String.self, forKey: .name)
-        self.statementDay = try container.decode(Int.self, forKey: .statementDay)
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(name, forKey: .name)
-        try container.encode(statementDay, forKey: .statementDay)
-    }
-    
-    var daysUntilStatement: Int {
-        let calendar = Calendar.current
-        let now = Date()
-        let currentComponents = calendar.dateComponents([.year, .month, .day], from: now)
-        var targetComponents = currentComponents
-        targetComponents.day = statementDay
-        if let currentDay = currentComponents.day, currentDay > statementDay {
-            targetComponents.month = (targetComponents.month ?? 1) + 1
-        }
-        guard let targetDate = calendar.date(from: targetComponents) else { return 0 }
-        let startOfToday = calendar.startOfDay(for: now)
-        let startOfTarget = calendar.startOfDay(for: targetDate)
-        return calendar.dateComponents([.day], from: startOfToday, to: startOfTarget).day ?? 0
-    }
-}
-
-// MARK: - Main Application
 @main
 struct CardTrackerApp: App {
     var body: some Scene {
@@ -57,7 +12,6 @@ struct CardTrackerApp: App {
     }
 }
 
-// MARK: - Main Dashboard
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var cards: [CreditCard]
@@ -72,7 +26,6 @@ struct ContentView: View {
         cards.sorted { $0.daysUntilStatement > $1.daysUntilStatement }
     }
     
-    // Grabs top 3 longest duration cards for the internal widget panel
     var topThreeCards: [CreditCard] {
         Array(sortedCards.prefix(3))
     }
@@ -86,7 +39,6 @@ struct ContentView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // Data Sync Controls
                         HStack(spacing: 16) {
                             Button(action: copyBackupToClipboard) {
                                 Label("Copy Backup", systemImage: "doc.on.doc.fill")
@@ -111,7 +63,6 @@ struct ContentView: View {
                         .padding(.horizontal)
                         .padding(.top, 8)
                         
-                        // Integrated Premium Home Screen Widget (Top 3 Live Panel)
                         if !topThreeCards.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack {
@@ -148,7 +99,6 @@ struct ContentView: View {
                             .padding(.horizontal)
                         }
                         
-                        // Action Button Placement
                         Button(action: { showingAddSheet = true }) {
                             HStack {
                                 Image(systemName: "plus.circle.fill")
@@ -166,7 +116,6 @@ struct ContentView: View {
                         }
                         .padding(.horizontal)
                         
-                        // List Entries Container
                         if sortedCards.isEmpty {
                             VStack(spacing: 12) {
                                 Image(systemName: "creditcard")
@@ -232,7 +181,6 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Card Component Row Row View
 struct GlassmorphicCardView: View {
     let card: CreditCard
     @Environment(\.modelContext) private var modelContext
@@ -278,7 +226,6 @@ struct GlassmorphicCardView: View {
     }
 }
 
-// MARK: - Modernized Form Module View
 struct AddCardView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -313,7 +260,6 @@ struct AddCardView: View {
                 .background(.white.opacity(0.05))
                 
                 VStack(spacing: 24) {
-                    // Changed Label from "Card Designation Name" to "Card Name"
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Card Name")
                             .font(.system(size: 14, weight: .bold))
@@ -325,7 +271,6 @@ struct AddCardView: View {
                             .cornerRadius(14)
                     }
                     
-                    // Changed Label from "Statement Cycle End Day" to "Statement Date"
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Statement Date")
                             .font(.system(size: 14, weight: .bold))
@@ -333,7 +278,6 @@ struct AddCardView: View {
                         
                         Picker("Closing Day", selection: $statementDay) {
                             ForEach(1...31, id: \.self) { day in
-                                // Removed the "Every Day" string injection prefix
                                 Text("\(day)").tag(day)
                             }
                         }
