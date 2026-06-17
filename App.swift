@@ -5,7 +5,6 @@ struct CreditCard: Identifiable, Codable {
     let name: String
     let statementDay: Int
     
-    // Calculates how many days are left from today until the NEXT statement date
     var daysUntilStatement: Int {
         let calendar = Calendar.current
         let now = Date()
@@ -14,14 +13,12 @@ struct CreditCard: Identifiable, Codable {
         var targetComponents = currentComponents
         targetComponents.day = statementDay
         
-        // If the statement day has already passed this month, target next month
         if let currentDay = currentComponents.day, currentDay > statementDay {
             targetComponents.month = (targetComponents.month ?? 1) + 1
         }
         
         guard let targetDate = calendar.date(from: targetComponents) else { return 0 }
         
-        // Return difference in days
         let startOfToday = calendar.startOfDay(for: now)
         let startOfTarget = calendar.startOfDay(for: targetDate)
         let components = calendar.dateComponents([.day], from: startOfToday, to: startOfTarget)
@@ -41,8 +38,7 @@ class CardViewModel: ObservableObject {
         loadCards()
     }
     
-    // Sorted with the LONGEST duration (highest days remaining) first
-    var sortedCards: [CreditCard] = [] {
+    var sortedCards: [CreditCard] {
         cards.sorted { $0.daysUntilStatement > $1.daysUntilStatement }
     }
     
@@ -52,7 +48,6 @@ class CardViewModel: ObservableObject {
     }
     
     func deleteCard(at offsets: IndexSet) {
-        // Map the sorted index back to the source array to delete correctly
         let sorted = sortedCards
         for index in offsets {
             let cardToDelete = sorted[index]
@@ -70,15 +65,6 @@ class CardViewModel: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: "SavedCards"),
            let decoded = try? JSONDecoder().decode([CreditCard].self, from: data) {
             self.cards = decoded
-        }
-    }
-}
-
-@main
-struct CardTrackerApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
         }
     }
 }
@@ -114,7 +100,7 @@ struct ContentView: View {
                 }
                 .onDelete(perform: viewModel.deleteCard)
             }
-            .navigationTitle("Card Statement Tracker")
+            .navigationTitle("Card Tracker")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingAddSheet = true }) {
@@ -164,6 +150,15 @@ struct AddCardView: View {
                     .disabled(cardName.isEmpty)
                 }
             }
+        }
+    }
+}
+
+@main
+struct CardTrackerApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
         }
     }
 }
