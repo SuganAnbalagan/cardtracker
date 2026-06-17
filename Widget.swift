@@ -13,7 +13,8 @@ struct WidgetCardModel: Identifiable, Codable {
     let daysLeft: Int
 }
 
-struct Provider: TimelineProvider {
+// Added @preconcurrency to fix the Swift 6 isolation checking warnings
+struct Provider: @preconcurrency TimelineProvider {
     func placeholder(in context: Context) -> WidgetEntry {
         WidgetEntry(date: Date(), topCards: [
             WidgetCardModel(id: UUID(), name: "Visa", daysLeft: 25),
@@ -25,20 +26,21 @@ struct Provider: TimelineProvider {
         completion(WidgetEntry(date: Date(), topCards: []))
     }
 
-    // Fixed: Added MainActor isolation so it has safe, verified permissions to read SwiftData
-    @MainActor
     func getTimeline(in context: Context, completion: @escaping (Timeline<WidgetEntry>) -> ()) {
-        let sharedContainer = try? ModelContainer(for: CreditCard.self)
-        let descriptor = FetchDescriptor<CreditCard>()
-        let cards = (try? sharedContainer?.mainContext.fetch(descriptor)) ?? []
-        
-        let sorted = cards.map { card in
-            WidgetCardModel(id: card.id, name: card.name, daysLeft: card.daysUntilStatement)
-        }.sorted { $0.daysLeft > $1.daysLeft }
-        
-        let entry = WidgetEntry(date: Date(), topCards: Array(sorted.prefix(3)))
-        let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(1800)))
-        completion(timeline)
+        Task {
+            // Reached into SwiftData schema on an independent background actor block
+            let sharedContainer = try? ModelContainer(for: CreditCard.self)
+            let descriptor = FetchDescriptor<CreditCard>()
+            let cards = (try? sharedContainer?.mainContext.fetch(descriptor)) ?? []
+            
+            let sorted = cards.map { card in
+                WidgetCardModel(id: card.id, name: card.name, daysLeft: card.daysUntilStatement)
+            }.sorted { $0.daysLeft > $1.daysLeft }
+            
+            let entry = WidgetEntry(date: Date(), topCards: Array(sorted.prefix(3)))
+            let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(1800)))
+            completion(timeline)
+        }
     }
 }
 
