@@ -15,7 +15,7 @@ jobs:
       run: |
         mkdir -p build/Payload/CardTracker.app
         xcrun --sdk iphoneos swiftc App.swift \
-          -target arm64-apple-ios15.0 \
+          -target arm64-apple-ios17.0 \
           -o build/Payload/CardTracker.app/CardTracker \
           -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
           -emit-executable \
@@ -23,7 +23,6 @@ jobs:
 
     - name: Generate High Resolution App Icons
       run: |
-        # Generate generic stylized minimalist icon matrix via CoreImage engine directly 
         mkdir -p build/Payload/CardTracker.app/Assets
         /usr/bin/swift -e '
         import Foundation
@@ -49,7 +48,6 @@ jobs:
 
     - name: Package App Bundle Metadata and Core Entitlements
       run: |
-        # Generate complete configuration Plist manifest file
         echo '<?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
@@ -65,7 +63,7 @@ jobs:
             <key>CFBundleVersion</key>
             <string>2</string>
             <key>MinimumOSVersion</key>
-            <string>15.0</string>
+            <string>17.0</string>
             <key>UIRequiredDeviceCapabilities</key>
             <array><string>arm64</string></array>
             <key>UILaunchScreen</key>
@@ -77,7 +75,6 @@ jobs:
         </dict>
         </plist>' > build/Payload/CardTracker.app/Info.plist
 
-        # Generate custom embedded system configuration entitlement rule definitions for iCloud capability support mapping 
         echo '<?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
