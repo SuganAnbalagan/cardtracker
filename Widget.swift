@@ -13,8 +13,7 @@ struct WidgetCardModel: Identifiable, Codable {
     let daysLeft: Int
 }
 
-// Added @preconcurrency to fix the Swift 6 isolation checking warnings
-struct Provider: @preconcurrency TimelineProvider {
+struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> WidgetEntry {
         WidgetEntry(date: Date(), topCards: [
             WidgetCardModel(id: UUID(), name: "Visa", daysLeft: 25),
@@ -27,8 +26,8 @@ struct Provider: @preconcurrency TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<WidgetEntry>) -> ()) {
-        Task {
-            // Reached into SwiftData schema on an independent background actor block
+        Task { @MainActor in
+            // Added @MainActor context and await to properly satisfy Swift 6 thread requirements
             let sharedContainer = try? ModelContainer(for: CreditCard.self)
             let descriptor = FetchDescriptor<CreditCard>()
             let cards = (try? sharedContainer?.mainContext.fetch(descriptor)) ?? []
