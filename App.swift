@@ -15,7 +15,6 @@ final class CreditCard: Identifiable, Codable {
         self.statementDay = statementDay
     }
     
-    // Codable requirements for Backup/Restore operations
     enum CodingKeys: CodingKey { case id, name, statementDay }
     
     required init(from decoder: Decoder) throws {
@@ -52,7 +51,7 @@ final class CreditCard: Identifiable, Codable {
     }
 }
 
-// MARK: - Main Application Entry Point
+// MARK: - Main Application
 @main
 struct CardTrackerApp: App {
     var body: some Scene {
@@ -69,7 +68,6 @@ struct ContentView: View {
     @Query private var cards: [CreditCard]
     @State private var showingAddSheet = false
     
-    // Backup / Restore Document states
     @State private var exportDocument: CardBackupDocument?
     @State private var isExporting = false
     @State private var isImporting = false
@@ -86,65 +84,89 @@ struct ContentView: View {
                     .ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 16) {
-                        // Backup / Restore Section Controls
-                        HStack(spacing: 20) {
+                    VStack(spacing: 24) {
+                        // 1. Aligned Backup and Restore Buttons
+                        HStack(spacing: 16) {
                             Button(action: triggerBackup) {
-                                Label("Backup", systemImage: "square.and.arrow.up.circle.fill")
-                                    .font(.subheadline)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                    .padding(.vertical, 8)
-                                    .padding(.horizontal, 16)
-                                    .background(Color.white.opacity(0.15))
-                                    .cornerRadius(12)
+                                HStack {
+                                    Image(systemName: "square.and.arrow.up")
+                                    Text("Backup")
+                                }
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .background(Color.white.opacity(0.15))
+                                .cornerRadius(12)
                             }
                             
                             Button(action: { isImporting = true }) {
-                                Label("Restore", systemImage: "square.and.arrow.down.circle.fill")
-                                    .font(.subheadline)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                    .padding(.vertical, 8)
-                                    .padding(.horizontal, 16)
-                                    .background(Color.white.opacity(0.15))
-                                    .cornerRadius(12)
+                                HStack {
+                                    Image(systemName: "square.and.arrow.down")
+                                    Text("Restore")
+                                }
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .background(Color.white.opacity(0.15))
+                                .cornerRadius(12)
                             }
                         }
+                        .padding(.horizontal)
                         .padding(.top, 8)
                         
-                        if sortedCards.isEmpty {
-                            Text("No Cards Added Yet")
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.6))
-                                .padding(.top, 100)
-                        } else {
-                            ForEach(sortedCards) { card in
-                                GlassmorphicCardView(card: card)
+                        // 2. Add New Card Button Placed Directly Below Controls
+                        Button(action: { showingAddSheet = true }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Add New Card")
                             }
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(Color.blue.opacity(0.4))
+                            .cornerRadius(14)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            )
+                        }
+                        .padding(.horizontal)
+                        
+                        // 3. Card Display Area
+                        if sortedCards.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "creditcard.and.123")
+                                    .font(.system(size: 48))
+                                    .foregroundColor(.white.opacity(0.3))
+                                Text("No Cards Added Yet")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                            .padding(.top, 60)
+                        } else {
+                            VStack(spacing: 16) {
+                                ForEach(sortedCards) { card in
+                                    GlassmorphicCardView(card: card)
+                                }
+                            }
+                            .padding(.horizontal)
                         }
                     }
-                    .padding()
+                    .padding(.vertical)
                 }
             }
             .navigationTitle("Card Tracker")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingAddSheet = true }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                    }
-                }
-            }
             .sheet(isPresented: $showingAddSheet) { AddCardView() }
-            // System native interaction controllers for handling local device files
             .fileExporter(isPresented: $isExporting, document: exportDocument, contentType: .json, defaultFilename: "CardTrackerBackup") { result in
                 if case .failure(let error) = result { print("Export Error: \(error.localizedDescription)") }
             }
-            .fileImporter(isPresented: $isImporting, allowedContentTypes: [.json]) { result in
+            .fileImporter(isPresented: $isImporting, allowedContentTypes: [.json], allowsMultipleSelection: false) { result in
                 switch result {
-                case .success(let url):
+                case .success(let urls):
+                    guard let url = urls.first else { return }
                     importBackup(from: url)
                 case .failure(let error):
                     print("Import Error: \(error.localizedDescription)")
@@ -162,17 +184,27 @@ struct ContentView: View {
     
     private func importBackup(from url: URL) {
         guard url.startAccessingSecurityScopedResource() else { return }
+        // Ensure the security scope is closed cleanly after reading the file
         defer { url.stopAccessingSecurityScopedResource() }
         
-        if let data = try? Data(contentsOf: url),
-           let importedCards = try? JSONDecoder().decode([CreditCard].self, from: data) {
-            // Flush out existing dataset configuration instances inside local database context
-            for card in cards { modelContext.delete(card) }
-            // Inject freshly processed data payload items
-            for newCard in importedCards { modelContext.insert(newCard) }
+        do {
+            let data = try Data(contentsOf: url)
+            let importedCards = try JSONDecoder().decode([CreditCard].self, from: data)
             
-            try? modelContext.save()
+            // Clean up existing context storage entries before replacing
+            for card in cards {
+                modelContext.delete(card)
+            }
+            
+            // Insert and save newly selected elements inside your database context container
+            for newCard in importedCards {
+                modelContext.insert(newCard)
+            }
+            
+            try modelContext.save()
             WidgetCenter.shared.reloadAllTimelines()
+        } catch {
+            print("Failed to read or decode backup package file contents: \(error)")
         }
     }
 }
@@ -183,7 +215,13 @@ struct CardBackupDocument: FileDocument {
     var data: Data
 
     init(data: Data) { self.data = data }
-    init(configuration: ReadConfiguration) throws { self.data = Data() }
+    init(configuration: ReadConfiguration) throws { 
+        if let data = configuration.file.regularFileContents {
+            self.data = data
+        } else {
+            self.data = Data()
+        }
+    }
 
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
         FileWrapper(regularFileWithContents: data)
