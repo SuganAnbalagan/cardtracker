@@ -1,4 +1,4 @@
-name: Build Unsigned iOS App & Widget
+name: Build Unsigned iOS App
 
 on:
   workflow_dispatch:
@@ -20,18 +20,17 @@ jobs:
           -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
           -emit-executable
 
-    - name: Compile Widget Extension PlugIn Separately
+    - name: Process and Resize App Icon
       run: |
-        mkdir -p build/Payload/CardTracker.app/PlugIns/CardTrackerWidget.appex
-        xcrun --sdk iphoneos swiftc Widget.swift Model.swift \
-          -target arm64-apple-ios17.0 \
-          -o build/Payload/CardTracker.app/PlugIns/CardTrackerWidget.appex/CardTrackerWidget \
-          -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
-          -emit-executable
+        # Takes your uploaded icon.png and creates the exact required sizes
+        mkdir -p build/Payload/CardTracker.app
+        if [ -f "icon.png" ]; then
+          sips -z 120 120 icon.png --out build/Payload/CardTracker.app/AppIcon60x60@2x.png
+          sips -z 180 180 icon.png --out build/Payload/CardTracker.app/AppIcon60x60@3x.png
+        fi
 
     - name: Package Metadata Profiles
       run: |
-        # Main App Manifest
         echo '<?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
@@ -52,33 +51,12 @@ jobs:
             <array><string>arm64</string></array>
             <key>UILaunchScreen</key>
             <dict/>
+            <key>CFBundleIconFiles</key>
+            <array>
+                <string>AppIcon60x60</string>
+            </array>
         </dict>
         </plist>' > build/Payload/CardTracker.app/Info.plist
-
-        # Widget Extension Manifest
-        echo '<?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>CFBundleExecutable</key>
-            <string>CardTrackerWidget</string>
-            <key>CFBundleIdentifier</key>
-            <string>com.premium.cardtracker.widget</string>
-            <key>CFBundleName</key>
-            <string>CardTrackerWidget</string>
-            <key>CFBundleShortVersionString</key>
-            <string>4.0</string>
-            <key>CFBundleVersion</key>
-            <string>4</string>
-            <key>MinimumOSVersion</key>
-            <string>17.0</string>
-            <key>NSExtension</key>
-            <dict>
-                <key>NSExtensionPointIdentifier</key>
-                <string>com.apple.widgetkit-extension</string>
-            </dict>
-        </dict>
-        </plist>' > build/Payload/CardTracker.app/PlugIns/CardTrackerWidget.appex/Info.plist
 
         cd build
         zip -r ../CardTracker.ipa Payload
@@ -86,5 +64,5 @@ jobs:
     - name: Upload IPA Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: CardTracker-With-Widget
+        name: CardTracker-Custom-Icon
         path: CardTracker.ipa
