@@ -41,9 +41,9 @@ jobs:
             <key>CFBundleName</key>
             <string>Card Tracker</string>
             <key>CFBundleShortVersionString</key>
-            <string>4.0</string>
+            <string>1.0</string>
             <key>CFBundleVersion</key>
-            <string>4</string>
+            <string>1</string>
             <key>MinimumOSVersion</key>
             <string>17.0</string>
             <key>UIRequiredDeviceCapabilities</key>
