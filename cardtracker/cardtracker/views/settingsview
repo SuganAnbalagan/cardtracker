@@ -1,0 +1,255 @@
+//
+//  SettingsView.swift
+//  CreditStatementTracker
+//
+
+import SwiftUI
+import SwiftData
+
+struct SettingsView: View {
+
+    @Environment(\.modelContext)
+    private var modelContext
+
+    @Query
+    private var cards: [CreditCard]
+
+    @AppStorage("sortDescending")
+    private var sortDescending = true
+
+    @AppStorage("useManualOrdering")
+    private var useManualOrdering = false
+
+    @AppStorage("notificationsEnabled")
+    private var notificationsEnabled = true
+
+    @AppStorage("faceIDEnabled")
+    private var faceIDEnabled = false
+
+    @AppStorage("showBankName")
+    private var showBankName = true
+
+    @AppStorage("showPaymentDate")
+    private var showPaymentDate = true
+
+    @State
+    private var showingDeleteConfirmation = false
+
+    var body: some View {
+
+        Form {
+
+            sortingSection
+
+            displaySection
+
+            securitySection
+
+            notificationSection
+
+            statisticsSection
+
+            dangerSection
+
+            aboutSection
+
+        }
+        .navigationTitle("Settings")
+        .confirmationDialog(
+            "Delete ALL credit cards?",
+            isPresented: $showingDeleteConfirmation
+        ) {
+
+            Button("Delete All", role: .destructive) {
+                deleteEverything()
+            }
+
+            Button("Cancel", role: .cancel) { }
+
+        }
+
+    }
+
+}
+
+// MARK: - Sections
+
+private extension SettingsView {
+
+    var sortingSection: some View {
+
+        Section("Sorting") {
+
+            Toggle(
+                "Manual Ordering",
+                isOn: $useManualOrdering
+            )
+
+            if !useManualOrdering {
+
+                Toggle(
+                    "Descending (Most Days First)",
+                    isOn: $sortDescending
+                )
+
+            }
+
+        }
+
+    }
+
+    var displaySection: some View {
+
+        Section("Display") {
+
+            Toggle(
+                "Show Bank Name",
+                isOn: $showBankName
+            )
+
+            Toggle(
+                "Show Payment Due Date",
+                isOn: $showPaymentDate
+            )
+
+        }
+
+    }
+
+    var securitySection: some View {
+
+        Section("Security") {
+
+            Toggle(
+                "Require Face ID",
+                isOn: $faceIDEnabled
+            )
+
+        }
+
+    }
+
+    var notificationSection: some View {
+
+        Section("Notifications") {
+
+            Toggle(
+                "Enable Notifications",
+                isOn: $notificationsEnabled
+            )
+
+            Text("Notification scheduling will be added in a later file.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+        }
+
+    }
+
+    var statisticsSection: some View {
+
+        Section("Statistics") {
+
+            LabeledContent(
+                "Credit Cards",
+                value: "\(cards.count)"
+            )
+
+            if let nextCard = cards.min(by: {
+                $0.daysRemaining < $1.daysRemaining
+            }) {
+
+                LabeledContent(
+                    "Next Statement",
+                    value: nextCard.name
+                )
+
+                LabeledContent(
+                    "Days Remaining",
+                    value: "\(nextCard.daysRemaining)"
+                )
+
+            } else {
+
+                Text("No cards added yet.")
+                    .foregroundStyle(.secondary)
+
+            }
+
+        }
+
+    }
+
+    var dangerSection: some View {
+
+        Section {
+
+            Button(role: .destructive) {
+                showingDeleteConfirmation = true
+            } label: {
+                Label(
+                    "Delete All Cards",
+                    systemImage: "trash"
+                )
+            }
+
+        }
+
+    }
+
+    var aboutSection: some View {
+
+        Section("About") {
+
+            LabeledContent(
+                "App",
+                value: "Credit Statement Tracker"
+            )
+
+            LabeledContent(
+                "Version",
+                value: "1.0"
+            )
+
+            Text("CloudKit sync and widgets are supported.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+        }
+
+    }
+
+}
+
+// MARK: - Helpers
+
+private extension SettingsView {
+
+    func deleteEverything() {
+
+        do {
+
+            for card in cards {
+                modelContext.delete(card)
+            }
+
+            try modelContext.save()
+
+        } catch {
+
+            print(error.localizedDescription)
+
+        }
+
+    }
+
+}
+
+#Preview {
+
+    NavigationStack {
+        SettingsView()
+    }
+    .modelContainer(for: CreditCard.self, inMemory: true)
+
+}
