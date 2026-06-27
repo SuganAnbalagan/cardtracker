@@ -1,6 +1,6 @@
 //
 //  RootView.swift
-//  CreditStatementTracker
+//  cardtracker
 //
 
 import SwiftUI
@@ -17,10 +17,10 @@ struct RootView: View {
     @State
     private var showingAddCard = false
 
-    @AppStorage("sortDescending")
+    @AppStorage(SharedConstants.Defaults.sortDescending)
     private var sortDescending = true
 
-    @AppStorage("useManualOrdering")
+    @AppStorage(SharedConstants.Defaults.useManualOrdering)
     private var useManualOrdering = false
 
     private var displayedCards: [CreditCard] {
@@ -38,7 +38,9 @@ struct RootView: View {
             } else {
                 return $0.daysRemaining < $1.daysRemaining
             }
+
         }
+
     }
 
     var body: some View {
@@ -81,6 +83,9 @@ struct RootView: View {
             .sheet(isPresented: $showingAddCard) {
                 AddEditCardView()
             }
+            .onAppear {
+                refreshServices()
+            }
 
         }
 
@@ -99,7 +104,9 @@ private extension RootView {
             ForEach(displayedCards) { card in
 
                 NavigationLink {
+
                     CardDetailView(card: card)
+
                 } label: {
 
                     HStack(spacing: 16) {
@@ -136,15 +143,13 @@ private extension RootView {
                             if card.isStatementToday {
 
                                 Text("TODAY")
-                                    .font(.caption2)
-                                    .bold()
+                                    .font(.caption2.bold())
                                     .foregroundStyle(.red)
 
                             } else if card.isStatementTomorrow {
 
                                 Text("TOMORROW")
-                                    .font(.caption2)
-                                    .bold()
+                                    .font(.caption2.bold())
                                     .foregroundStyle(.orange)
 
                             }
@@ -155,7 +160,7 @@ private extension RootView {
                     .padding(.vertical, 6)
 
                 }
-                .swipeActions(edge: .trailing) {
+                .swipeActions {
 
                     Button(role: .destructive) {
                         delete(card)
@@ -174,7 +179,7 @@ private extension RootView {
 
 }
 
-// MARK: - Empty State
+// MARK: - Empty
 
 private extension RootView {
 
@@ -212,10 +217,23 @@ private extension RootView {
         modelContext.delete(card)
 
         do {
+
             try modelContext.save()
+            refreshServices()
+
         } catch {
+
             print(error.localizedDescription)
+
         }
+
+    }
+
+    func refreshServices() {
+
+        WidgetSyncService.shared.updateSnapshot(cards: cards)
+
+        CloudSyncManager.shared.dataDidChange(cards: cards)
 
     }
 
