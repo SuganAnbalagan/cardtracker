@@ -1,6 +1,6 @@
 //
 //  AddEditCardView.swift
-//  CreditStatementTracker
+//  cardtracker
 //
 
 import SwiftUI
@@ -13,6 +13,9 @@ struct AddEditCardView: View {
 
     @Environment(\.modelContext)
     private var modelContext
+
+    @Query
+    private var allCards: [CreditCard]
 
     private let editingCard: CreditCard?
 
@@ -39,22 +42,12 @@ struct AddEditCardView: View {
     ]
 
     private let emojis = [
-        "💳",
-        "🏦",
-        "💰",
-        "💵",
-        "💎",
-        "🪙",
-        "⭐️",
-        "🚀",
-        "🦁",
-        "🔥",
-        "🛍️",
-        "✈️"
+        "💳","🏦","💰","💵","💎","🪙",
+        "⭐️","🚀","🦁","🔥","🛍️","✈️"
     ]
 
     init(card: CreditCard? = nil) {
-        self.editingCard = card
+        editingCard = card
     }
 
     var body: some View {
@@ -63,16 +56,142 @@ struct AddEditCardView: View {
 
             Form {
 
-                cardSection
+                Section("Card") {
 
-                statementSection
+                    TextField("Card Name", text: $name)
 
-                paymentSection
+                    TextField("Bank", text: $bank)
 
-                appearanceSection
+                }
+
+                Section("Statement") {
+
+                    Picker("Statement Day", selection: $statementDay) {
+
+                        ForEach(1...31, id: \.self) {
+                            Text("\($0)").tag($0)
+                        }
+
+                    }
+
+                }
+
+                Section("Payment Due") {
+
+                    Toggle(
+                        "Has Payment Due Date",
+                        isOn: $hasPaymentDueDate
+                    )
+
+                    if hasPaymentDueDate {
+
+                        Picker("Payment Day", selection: $paymentDueDay) {
+
+                            ForEach(1...31, id: \.self) {
+                                Text("\($0)").tag($0)
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                Section("Appearance") {
+
+                    VStack(alignment: .leading) {
+
+                        Text("Icon")
+                            .font(.caption)
+
+                        LazyVGrid(
+                            columns: Array(
+                                repeating: GridItem(.flexible()),
+                                count: 6
+                            )
+                        ) {
+
+                            ForEach(emojis, id: \.self) { emoji in
+
+                                Button {
+
+                                    selectedEmoji = emoji
+
+                                } label: {
+
+                                    Text(emoji)
+                                        .font(.title2)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(8)
+                                        .background(
+                                            selectedEmoji == emoji
+                                            ? Color.accentColor.opacity(0.25)
+                                            : .clear
+                                        )
+                                        .clipShape(
+                                            RoundedRectangle(
+                                                cornerRadius: 8
+                                            )
+                                        )
+
+                                }
+                                .buttonStyle(.plain)
+
+                            }
+
+                        }
+
+                    }
+
+                    VStack(alignment: .leading) {
+
+                        Text("Color")
+                            .font(.caption)
+
+                        LazyVGrid(
+                            columns: Array(
+                                repeating: GridItem(.flexible()),
+                                count: 4
+                            )
+                        ) {
+
+                            ForEach(colors, id: \.self) { color in
+
+                                Button {
+
+                                    selectedColor = color
+
+                                } label: {
+
+                                    Circle()
+                                        .fill(Color(hex: color))
+                                        .frame(width: 36, height: 36)
+                                        .overlay {
+
+                                            if selectedColor == color {
+
+                                                Image(systemName: "checkmark")
+                                                    .foregroundStyle(.white)
+
+                                            }
+
+                                        }
+
+                                }
+                                .buttonStyle(.plain)
+
+                            }
+
+                        }
+
+                    }
+
+                }
 
             }
-            .navigationTitle(editingCard == nil ? "New Card" : "Edit Card")
+            .navigationTitle(
+                editingCard == nil ? "New Card" : "Edit Card"
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
 
@@ -89,13 +208,17 @@ struct AddEditCardView: View {
                     Button("Save") {
                         save()
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(
+                        name.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ).isEmpty
+                    )
 
                 }
 
             }
             .onAppear {
-                loadCard()
+                load()
             }
 
         }
@@ -104,191 +227,11 @@ struct AddEditCardView: View {
 
 }
 
-// MARK: Sections
+// MARK: - Helpers
 
 private extension AddEditCardView {
 
-    var cardSection: some View {
-
-        Section("Card") {
-
-            TextField("Card Name", text: $name)
-
-            TextField("Bank", text: $bank)
-
-        }
-
-    }
-
-    var statementSection: some View {
-
-        Section("Statement") {
-
-            Picker("Statement Day", selection: $statementDay) {
-
-                ForEach(1...31, id: \.self) { day in
-                    Text("\(day)")
-                        .tag(day)
-                }
-
-            }
-
-        }
-
-    }
-
-    var paymentSection: some View {
-
-        Section("Payment Due") {
-
-            Toggle(
-                "Has Payment Due Date",
-                isOn: $hasPaymentDueDate
-            )
-
-            if hasPaymentDueDate {
-
-                Picker("Payment Day", selection: $paymentDueDay) {
-
-                    ForEach(1...31, id: \.self) { day in
-                        Text("\(day)")
-                            .tag(day)
-                    }
-
-                }
-
-            }
-
-        }
-
-    }
-
-    var appearanceSection: some View {
-
-        Section("Appearance") {
-
-            VStack(alignment: .leading) {
-
-                Text("Icon")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible()), count: 6)
-                ) {
-
-                    ForEach(emojis, id: \.self) { emoji in
-
-                        Button {
-
-                            selectedEmoji = emoji
-
-                        } label: {
-
-                            Text(emoji)
-                                .font(.title2)
-                                .padding(8)
-                                .frame(maxWidth: .infinity)
-                                .background(
-                                    selectedEmoji == emoji
-                                    ? Color.accentColor.opacity(0.25)
-                                    : Color.clear
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                        }
-                        .buttonStyle(.plain)
-
-                    }
-
-                }
-
-            }
-
-            VStack(alignment: .leading) {
-
-                Text("Color")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible()), count: 4)
-                ) {
-
-                    ForEach(colors, id: \.self) { hex in
-
-                        Button {
-
-                            selectedColor = hex
-
-                        } label: {
-
-                            Circle()
-                                .fill(Color(hex: hex))
-                                .frame(width: 36, height: 36)
-                                .overlay {
-
-                                    if selectedColor == hex {
-
-                                        Image(systemName: "checkmark")
-                                            .foregroundStyle(.white)
-
-                                    }
-
-                                }
-
-                        }
-                        .buttonStyle(.plain)
-
-                    }
-
-                }
-
-            }
-
-        }
-
-    }
-
-}
-
-// MARK: Save
-
-private extension AddEditCardView {
-
-    func save() {
-
-        if let editingCard {
-
-            editingCard.name = name
-            editingCard.bank = bank
-            editingCard.statementDay = statementDay
-            editingCard.paymentDueDay = hasPaymentDueDate ? paymentDueDay : nil
-            editingCard.colorHex = selectedColor
-            editingCard.icon = selectedEmoji
-
-        } else {
-
-            let card = CreditCard(
-                name: name,
-                bank: bank,
-                statementDay: statementDay,
-                paymentDueDay: hasPaymentDueDate ? paymentDueDay : nil,
-                colorHex: selectedColor,
-                icon: selectedEmoji
-            )
-
-            modelContext.insert(card)
-
-        }
-
-        try? modelContext.save()
-
-        dismiss()
-
-    }
-
-    func loadCard() {
+    func load() {
 
         guard let card = editingCard else {
             return
@@ -308,9 +251,52 @@ private extension AddEditCardView {
 
     }
 
-}
+    func save() {
 
-// MARK: Preview
+        if let editingCard {
+
+            editingCard.name = name
+            editingCard.bank = bank
+            editingCard.statementDay = statementDay
+            editingCard.paymentDueDay = hasPaymentDueDate ? paymentDueDay : nil
+            editingCard.colorHex = selectedColor
+            editingCard.icon = selectedEmoji
+
+        } else {
+
+            let newCard = CreditCard(
+                name: name,
+                bank: bank,
+                statementDay: statementDay,
+                paymentDueDay: hasPaymentDueDate ? paymentDueDay : nil,
+                colorHex: selectedColor,
+                icon: selectedEmoji,
+                manualOrder: allCards.count
+            )
+
+            modelContext.insert(newCard)
+
+        }
+
+        do {
+
+            try modelContext.save()
+
+            WidgetSyncService.shared.updateSnapshot(cards: allCards)
+
+            CloudSyncManager.shared.dataDidChange(cards: allCards)
+
+            dismiss()
+
+        } catch {
+
+            print(error.localizedDescription)
+
+        }
+
+    }
+
+}
 
 #Preview {
 
